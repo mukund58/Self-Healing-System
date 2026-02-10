@@ -3,9 +3,9 @@ services:
     image: postgres:16
     container_name: postgres
     environment:
-      POSTGRES_DB: tasksdb
-      POSTGRES_USER: postgres
-      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: ${POSTGRES_DB:-tasksdb}
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD is required}
     volumes:
       - pgdata:/var/lib/postgresql/data
     ports:
@@ -26,7 +26,7 @@ services:
       postgres:
         condition: service_healthy
     environment:
-      ConnectionStrings__DefaultConnection: Host=postgres;Port=5432;Database=tasksdb;Username=postgres;Password=postgres
+      ConnectionStrings__DefaultConnection: ${CONNECTION_STRING:?CONNECTION_STRING is required}
     ports:
       - "5000:8080"
 

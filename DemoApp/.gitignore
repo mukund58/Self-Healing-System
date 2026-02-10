@@ -1,0 +1,51 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+dist-ssr/
+bin/
+obj/
+
+# Environment files (contain secrets)
+.env
+.env.local
+.env.*.local
+
+# App settings with secrets
+**/appsettings.json
+**/appsettings.*.json
+!**/appsettings.Example.json
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# IDE/Editor
+.vscode/*
+!.vscode/extensions.json
+!.vscode/launch.json
+!.vscode/tasks.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sw?
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Local files
+*.local
+
+# User secrets (ASP.NET)
+secrets.json
+
+# Docker
+docker-compose.override.yml
