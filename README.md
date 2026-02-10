@@ -21,18 +21,28 @@ The Self-Healing System is an intelligent infrastructure management solution tha
 
 The system architecture is documented in the UML class diagram, which illustrates the relationships between key components:
 
-![UML Class Diagram]( Self-Healing System – UML Class Diagram.drawio)
+### Sequence Diagram.
+![Sequence Diagram]( UML/Sequence-Diagram.png)
+
+### Use-Case Diagram
+![Use Case  Diagram]( UML/USE-Case-Diagram.png)
+
+### UML-Activity Diagram
+![UML Activity Diagram]( UML/UML-Activity-Diagram.png)
 
 ### ER Diagrams
 
 The database schema and entity relationships are visualized in multiple ER diagram versions:
 
 #### Primary ER Diagram
-![ER Diagram - Main](ER Diagram-Page-1.drawio.png)
+![ER Diagram - Main](UML/Er-Diagram.png)
 
+#### Relational Table 
+![Relational Table ](UML/Relational-Table.png)
 
 ## 📖 Documentation
 
+- Read the [docs](DemoApp/README.md)
 - **UML Class Diagram**: Defines the object-oriented structure and relationships
 - **ER Diagrams**: Define the database schema and entity relationships
 
