@@ -15,21 +15,23 @@ spec:
       containers:
       - name: taskapi
         image: taskapi:1.0
+        imagePullPolicy: Never
         ports:
-        - containerPort: 80
+        - containerPort: 8080
+          name: http
         env:
         - name: ASPNETCORE_URLS
-          value: "http://0.0.0.0:80"
+          value: "http://0.0.0.0:8080"
 
         livenessProbe:
           httpGet:
             path: /health
-            port: 80
+            port: 8080
           initialDelaySeconds: 10
           periodSeconds: 10
         readinessProbe:
           httpGet:
             path: /health
-            port: 80
+            port: 8080
           initialDelaySeconds: 5
           periodSeconds: 5

@@ -2,9 +2,12 @@ apiVersion: v1
 kind: Service
 metadata:
   name: taskapi
+  labels:
+    app: taskapi
 spec:
   selector:
     app: taskapi
   ports:
-    - port: 80
-      targetPort: 80
+    - name: http
+      port: 80
+      targetPort: 8080

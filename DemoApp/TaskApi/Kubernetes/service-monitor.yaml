@@ -1,0 +1,14 @@
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: taskapi
+  labels:
+    app: prometheus
+spec:
+  selector:
+    matchLabels:
+      app: taskapi
+  endpoints:
+    - port: http
+      path: /metrics
+      interval: 5s
