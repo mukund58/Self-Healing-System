@@ -96,3 +96,25 @@ System runtime working set metric:
 - The API listens on port 8080 inside the container.
 - TaskApi/Kubernetes/service.yaml exposes a named port "http" for ServiceMonitor discovery.
 - TaskApi/Kubernetes/deployment.yaml uses imagePullPolicy: Never for kind local images.
+```
+┌──────────────────────────┐
+│   Kubernetes Operator    │   ← NOT built yet
+│  (acts on decisions)     │
+└──────────▲───────────────┘
+           │
+┌──────────┴───────────────┐
+│   Decision Engine        │   ← NOT built yet
+│  (chooses actions)       │
+└──────────▲───────────────┘
+           │
+┌──────────┴───────────────┐
+│   Analyzer               │   ← NEXT (Days 3–4)
+│  (detects anomalies)     │
+└──────────▲───────────────┘
+           │
+┌──────────┴───────────────┐
+│   Observability Layer    │   ← WE BUILT THIS
+│  (metrics + health)      │
+└──────────────────────────┘
+
+```
