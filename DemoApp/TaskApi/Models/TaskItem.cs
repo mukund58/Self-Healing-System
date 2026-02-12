@@ -1,5 +1,3 @@
-using System;
-
 namespace TaskApi.Models;
 
 public class TaskItem

@@ -1,5 +1,3 @@
-using System;
-
 namespace TaskApi.Domain;
 
 public class FailureEvent

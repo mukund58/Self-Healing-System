@@ -1,9 +1,10 @@
 using Microsoft.EntityFrameworkCore;
-using TaskApi.Data;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
 using Prometheus;
+using TaskApi.Data;
 
 var builder = WebApplication.CreateBuilder(args);
+const string corsPolicyName = "AllowFrontend";
 
 builder.Services.AddDbContext<AppDbContext>(options =>
 {
@@ -14,27 +15,28 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 builder.Services.AddControllers();
 
 builder.Services.AddHealthChecks()
-    .AddCheck("self", () =>
-        HealthCheckResult.Healthy("OK"));
+    .AddCheck("self", () => HealthCheckResult.Healthy("OK"));
 
+var allowedOrigins = builder.Configuration
+    .GetSection("Cors:AllowedOrigins")
+    .Get<string[]>()
+    ?? new[] { "http://localhost:5173" };
 
-// CORS
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowFrontend",
-        policy =>
-        {
-            policy
-                .WithOrigins("http://localhost:5173") // Vite default
-                .AllowAnyHeader()
-                .AllowAnyMethod();
-        });
+    options.AddPolicy(corsPolicyName, policy =>
+    {
+        policy
+            .WithOrigins(allowedOrigins)
+            .AllowAnyHeader()
+            .AllowAnyMethod();
+    });
 });
 
 
 var app = builder.Build();
 // Use CORS (ORDER MATTERS)
-app.UseCors("AllowFrontend");
+app.UseCors(corsPolicyName);
 
 
 app.UseRouting();
