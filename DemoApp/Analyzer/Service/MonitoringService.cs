@@ -64,12 +64,10 @@ public class MonitoringService : BackgroundService
 
                     if (result != null)
                     {
-                        _state.LastResult = result;
-                        _state.RecentEvents.Add(result);
                         _logger.LogWarning("⚠ Anomaly detected: {Type} - {Desc}",
                             result.FailureType, result.Description);
 
-                        // Trigger recovery orchestrator
+                        // Trigger recovery orchestrator — updates state with persisted ID
                         await TriggerRecoveryAsync(result, stoppingToken);
                     }
                 }
@@ -93,6 +91,10 @@ public class MonitoringService : BackgroundService
 
             if (recoveryResult != null)
             {
+                // Update state with the persisted failure (which now has a real Id)
+                failure.Id = recoveryResult.FailureEventId;
+                _state.LastResult = failure;
+                _state.RecentEvents.Add(failure);
                 _state.RecentRecoveries.Add(recoveryResult);
             }
         }

@@ -1,75 +1,79 @@
-using System.Net.Http.Json;
-using System.Text;
-using System.Text.Json;
+using k8s;
+using k8s.Models;
 
 namespace Analyzer.Service;
 
 public class KubernetesScaler
 {
-    private readonly HttpClient _http;
+    private IKubernetes? _client;
     private readonly ILogger<KubernetesScaler> _logger;
     private readonly string _namespace;
+    private bool _initAttempted;
 
-    public KubernetesScaler(HttpClient http, ILogger<KubernetesScaler> logger, IConfiguration config)
+    public KubernetesScaler(ILogger<KubernetesScaler> logger, IConfiguration config)
     {
-        _http = http;
         _logger = logger;
         _namespace = config.GetValue<string>("Kubernetes:Namespace") ?? "default";
+        _initAttempted = false;
+    }
+
+    private void EnsureInitialized()
+    {
+        if (_initAttempted) return;
+        _initAttempted = true;
+
+        try
+        {
+            KubernetesClientConfiguration config;
+
+            if (KubernetesClientConfiguration.IsInCluster())
+            {
+                config = KubernetesClientConfiguration.InClusterConfig();
+                _logger.LogInformation("Kubernetes client initialized via InClusterConfig (namespace={Ns})", _namespace);
+            }
+            else
+            {
+                config = KubernetesClientConfiguration.BuildConfigFromConfigFile();
+                _logger.LogInformation("Kubernetes client initialized via kubeconfig (namespace={Ns})", _namespace);
+            }
+
+            _client = new Kubernetes(config);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "Failed to initialize Kubernetes client; K8s operations will be unavailable");
+            _client = null;
+        }
     }
 
     /// <summary>
-    /// Scale a deployment to the target replica count via the Kubernetes API.
+    /// Scale a deployment to the target replica count.
     /// </summary>
     public async Task<ScaleResult> ScaleDeploymentAsync(
         string deploymentName, int targetReplicas, CancellationToken ct)
     {
+        EnsureInitialized();
+        if (_client is null)
+            return ScaleResult.Fail("Not running inside a Kubernetes cluster");
+
         try
         {
-            var url = $"/apis/apps/v1/namespaces/{_namespace}/deployments/{deploymentName}/scale";
-
-            // GET current scale
-            var getResp = await _http.GetAsync(url, ct);
-            if (!getResp.IsSuccessStatusCode)
-            {
-                var body = await getResp.Content.ReadAsStringAsync(ct);
-                return ScaleResult.Fail($"GET scale failed ({getResp.StatusCode}): {body}");
-            }
-
-            var scaleJson = await getResp.Content.ReadAsStringAsync(ct);
-            using var doc = JsonDocument.Parse(scaleJson);
-            var currentReplicas = doc.RootElement
-                .GetProperty("spec")
-                .GetProperty("replicas")
-                .GetInt32();
+            var scale = await _client.AppsV1.ReadNamespacedDeploymentScaleAsync(
+                deploymentName, _namespace, cancellationToken: ct);
+            var current = scale.Spec.Replicas ?? 1;
 
             _logger.LogInformation(
                 "Deployment {Name}: current={Current}, target={Target}",
-                deploymentName, currentReplicas, targetReplicas);
+                deploymentName, current, targetReplicas);
 
-            if (currentReplicas == targetReplicas)
-            {
+            if (current == targetReplicas)
                 return ScaleResult.Ok($"Already at {targetReplicas} replicas");
-            }
 
-            // PATCH scale
-            var patch = new
-            {
-                spec = new { replicas = targetReplicas }
-            };
+            scale.Spec.Replicas = targetReplicas;
+            await _client.AppsV1.ReplaceNamespacedDeploymentScaleAsync(
+                scale, deploymentName, _namespace, cancellationToken: ct);
 
-            var content = new StringContent(
-                JsonSerializer.Serialize(patch),
-                Encoding.UTF8,
-                "application/merge-patch+json");
-
-            var patchResp = await _http.PatchAsync(url, content, ct);
-            if (!patchResp.IsSuccessStatusCode)
-            {
-                var body = await patchResp.Content.ReadAsStringAsync(ct);
-                return ScaleResult.Fail($"PATCH scale failed ({patchResp.StatusCode}): {body}");
-            }
-
-            return ScaleResult.Ok($"Scaled {deploymentName} from {currentReplicas} to {targetReplicas}");
+            return ScaleResult.Ok($"Scaled {deploymentName} from {current} to {targetReplicas}");
         }
         catch (Exception ex)
         {
@@ -79,42 +83,34 @@ public class KubernetesScaler
     }
 
     /// <summary>
-    /// Restart a deployment by patching the pod template annotation.
+    /// Restart a deployment by patching the pod template annotation (rolling restart).
     /// </summary>
     public async Task<ScaleResult> RestartDeploymentAsync(string deploymentName, CancellationToken ct)
     {
+        EnsureInitialized();
+        if (_client is null)
+            return ScaleResult.Fail("Not running inside a Kubernetes cluster");
+
         try
         {
-            var url = $"/apis/apps/v1/namespaces/{_namespace}/deployments/{deploymentName}";
-            var patch = new
-            {
-                spec = new
-                {
-                    template = new
-                    {
-                        metadata = new
-                        {
-                            annotations = new Dictionary<string, string>
-                            {
-                                ["self-healing/restartedAt"] = DateTime.UtcNow.ToString("o")
-                            }
-                        }
-                    }
-                }
-            };
+            var patchBody = $@"
+            {{
+                ""spec"": {{
+                    ""template"": {{
+                        ""metadata"": {{
+                            ""annotations"": {{
+                                ""self-healing/restartedAt"": ""{DateTime.UtcNow:o}""
+                            }}
+                        }}
+                    }}
+                }}
+            }}";
 
-            var content = new StringContent(
-                JsonSerializer.Serialize(patch),
-                Encoding.UTF8,
-                "application/merge-patch+json");
+            var patch = new V1Patch(patchBody, V1Patch.PatchType.MergePatch);
+            await _client.AppsV1.PatchNamespacedDeploymentAsync(
+                patch, deploymentName, _namespace, cancellationToken: ct);
 
-            var response = await _http.PatchAsync(url, content, ct);
-            if (!response.IsSuccessStatusCode)
-            {
-                var body = await response.Content.ReadAsStringAsync(ct);
-                return ScaleResult.Fail($"Restart failed ({response.StatusCode}): {body}");
-            }
-
+            _logger.LogInformation("Restarted deployment {Name}", deploymentName);
             return ScaleResult.Ok($"Restarted deployment {deploymentName}");
         }
         catch (Exception ex)

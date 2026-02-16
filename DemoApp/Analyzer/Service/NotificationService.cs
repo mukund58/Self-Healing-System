@@ -24,9 +24,11 @@ public class NotificationService
     {
         var message = FormatMessage(failure, actionType, recoveryStatus, details);
 
-        // Always log to console
+        // Always log to console + structured log
         var emoji = recoveryStatus == "Success" ? "✅" : "❌";
         Console.WriteLine($"{emoji} [ALERT] {message}");
+        _logger.LogWarning("🔔 NOTIFICATION: {Emoji} {FailureType} | Action: {Action} → {Status} | {Details}",
+            emoji, failure.FailureType, actionType, recoveryStatus, details);
 
         // Send webhook if configured
         if (!string.IsNullOrWhiteSpace(_webhookUrl))

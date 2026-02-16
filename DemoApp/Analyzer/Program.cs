@@ -18,10 +18,7 @@ var prometheusUrl = builder.Configuration.GetValue<string>("Endpoints:Prometheus
 var taskApiUrl = builder.Configuration.GetValue<string>("Endpoints:TaskApiBaseUrl")
     ?? "http://localhost:5186";
 
-var k8sApiUrl = builder.Configuration.GetValue<string>("Kubernetes:ApiUrl")
-    ?? "https://kubernetes.default.svc";
-
-var k8sToken = builder.Configuration.GetValue<string>("Kubernetes:BearerToken") ?? "";
+// KubernetesScaler uses InClusterConfig() — no manual URL/token needed
 
 // Prometheus client
 builder.Services.AddHttpClient<PrometheusClient>(client =>
@@ -45,14 +42,8 @@ builder.Services.AddHttpClient<RecoveryActionClient>(client =>
     client.BaseAddress = new Uri(taskApiUrl);
 });
 
-// Kubernetes scaler
-builder.Services.AddHttpClient<KubernetesScaler>(client =>
-{
-    client.BaseAddress = new Uri(k8sApiUrl);
-    if (!string.IsNullOrWhiteSpace(k8sToken))
-        client.DefaultRequestHeaders.Authorization =
-            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", k8sToken);
-});
+// Kubernetes scaler (uses official client with InClusterConfig)
+builder.Services.AddSingleton<KubernetesScaler>();
 
 // Notification service
 builder.Services.AddHttpClient<NotificationService>();
