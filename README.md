@@ -35,7 +35,7 @@ The Self-Healing System monitors application health via Prometheus metrics, dete
 
 ## 🎯 Features
 
-- **Multi-Signal Anomaly Detection** — 3 sliding-window rules for memory leaks, CPU spikes, and high error rates
+- **Multi-Signal Anomaly Detection** — 3 sliding-window rules: OLS regression-based memory leak detection (R² confidence gating), CPU spike detection, and high error rate detection
 - **Root Cause Diagnosis** — Correlates 4 metrics (memory, CPU, error rate, request rate) to classify failures: ResourceExhaustion, TrafficOverload, ApplicationError, DependencyFailure, MemoryLeakSuspected, HighCpuUsage
 - **Strategic Remediation** — Multi-step recovery strategies (e.g., ScaleUp → wait → RestartPod) selected per root cause
 - **Learning Loop** — Records every recovery outcome and recommends the best strategy based on historical success rates

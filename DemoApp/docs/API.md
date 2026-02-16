@@ -117,7 +117,7 @@ List failure events with optional filters.
     "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
     "failureType": "MemoryLeakSuspected",
     "severity": "Warning",
-    "description": "Memory growing at 25.30 MB/min",
+    "description": "Memory trending +25.3 MB/min (R²=0.87, n=20, 1.6min window)",
     "detectedAt": "2025-01-15T10:30:00Z",
     "resolved": false,
     "resolvedAt": null
@@ -137,7 +137,7 @@ Create a new failure event.
 {
   "failureType": "MemoryLeakSuspected",
   "severity": "Warning",
-  "description": "Memory growing at 25.30 MB/min",
+  "description": "Memory trending +25.3 MB/min (R²=0.87, n=20, 1.6min window)",
   "detectedAt": "2025-01-15T10:30:00Z"
 }
 ```
@@ -168,7 +168,7 @@ Mark a failure event as resolved.
   "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
   "failureType": "MemoryLeakSuspected",
   "severity": "Warning",
-  "description": "Memory growing at 25.30 MB/min",
+  "description": "Memory trending +25.3 MB/min (R²=0.87, n=20, 1.6min window)",
   "detectedAt": "2025-01-15T10:30:00Z",
   "resolved": true,
   "resolvedAt": "2025-01-15T10:35:00Z"
@@ -436,7 +436,7 @@ If an anomaly was detected:
   "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
   "failureType": "MemoryLeakSuspected",
   "severity": "Warning",
-  "description": "Memory growing at 25.30 MB/min",
+  "description": "Memory trending +25.3 MB/min (R²=0.87, n=20, 1.6min window)",
   "detectedAt": "2025-01-15T10:30:00Z",
   "resolved": false
 }
@@ -458,7 +458,7 @@ Get the last 20 failure events detected by the analyzer.
     "id": "3fa85f64-5717-4562-b3fc-2c963f66afa6",
     "failureType": "MemoryLeakSuspected",
     "severity": "Warning",
-    "description": "Memory growing at 25.30 MB/min",
+    "description": "Memory trending +25.3 MB/min (R²=0.87, n=20, 1.6min window)",
     "detectedAt": "2025-01-15T10:30:00Z",
     "resolved": false
   }
@@ -625,6 +625,61 @@ If no data yet:
 |-------------|------------|-----------------------|
 | `value`     | `double`   | Metric value in MB    |
 | `timestamp` | `datetime` | Sample timestamp      |
+
+---
+
+## Anomaly Detection — Memory Leak Rule
+
+The memory leak detector uses **ordinary least-squares (OLS) linear regression** over a sliding window of metric samples. It fires only when both slope and statistical confidence exceed their thresholds.
+
+### Algorithm
+
+Given a window of `n` samples `(x_i, y_i)` where `x = elapsed minutes`, `y = memory MB`:
+
+```
+slope = (n·Σxy − Σx·Σy) / (n·Σx² − (Σx)²)
+R²    = 1 − SS_res / SS_tot
+```
+
+The rule alerts when **both conditions** are met:
+- `slope > 15 MB/min` (memory is growing fast)
+- `R² > 0.60` (the upward trend is statistically consistent, not noise)
+
+### Parameters
+
+| Parameter              | Value | Description                                      |
+|------------------------|-------|--------------------------------------------------|
+| `WindowSize`           | 20    | Max samples in sliding window (~100s at 5s poll) |
+| `MinSamplesForRegression` | 10 | Minimum samples before first evaluation          |
+| `SlopeMbPerMinute`     | 15    | Slope threshold (MB/min)                         |
+| `MinR2`                | 0.60  | Minimum R² confidence                            |
+| `CriticalSlopeMbPerMinute` | 50 | Slope for Critical severity upgrade             |
+| `HighConfidenceR2`     | 0.85  | R² for Critical severity upgrade                 |
+| `CooldownPeriod`       | 3 min | Minimum gap between alerts                       |
+
+### Severity Classification
+
+| Condition                              | Severity   |
+|----------------------------------------|------------|
+| `slope > 50` AND `R² > 0.85`          | `Critical` |
+| `slope > 15` AND `R² > 0.60`          | `Warning`  |
+| Otherwise                              | No alert   |
+
+### Example Description Format
+
+```
+Memory trending +18.7 MB/min (R²=0.74, n=20, 1.6min window)
+```
+
+This means: the OLS regression over 20 samples spanning 1.6 minutes computed a growth rate of 18.7 MB/min with 74% of variance explained by the linear trend.
+
+### Why R² Matters
+
+- **R² ≈ 1.0** → Memory is rising in a straight line (true leak)
+- **R² ≈ 0.5** → Noisy, some upward trend but inconsistent
+- **R² < 0.3** → Random fluctuations, no real trend
+
+The dual gate (slope + R²) means a single memory spike does NOT trigger an alert — only **sustained, statistically significant growth** does.
 
 ---
 

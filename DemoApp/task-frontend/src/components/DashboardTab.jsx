@@ -276,7 +276,7 @@ export function DashboardTab({ health }) {
                 </InfoRow>
                 <Separator />
                 <InfoRow label="Description">
-                  <span className="text-sm text-card-foreground leading-relaxed">{latestAnalysis.description}</span>
+                  <RegressionDescription text={latestAnalysis.description} />
                 </InfoRow>
                 <InfoRow label="Detected">
                   <span className="text-sm text-muted-foreground">{new Date(latestAnalysis.detectedAt).toLocaleString()}</span>
@@ -411,4 +411,38 @@ function InfoRow({ label, children }) {
       <div className="flex-1">{children}</div>
     </div>
   );
+}
+
+/** Parse regression stats from description like "Memory trending +18.7 MB/min (R²=0.74, n=20, 1.6min window)" */
+function RegressionDescription({ text }) {
+  const match = text?.match(/([\+\-]?[\d.]+)\s*MB\/min.*?R²=(\d\.\d+).*?n=(\d+).*?([\d.]+)min/);
+  if (match) {
+    const slope = parseFloat(match[1]);
+    const r2 = parseFloat(match[2]);
+    const n = parseInt(match[3]);
+    const mins = match[4];
+    const r2Color = r2 >= 0.85 ? "text-destructive" : r2 >= 0.60 ? "text-warning" : "text-muted-foreground";
+    return (
+      <div className="flex flex-col gap-1.5">
+        <span className="text-sm font-semibold text-card-foreground">
+          +{slope.toFixed(1)} MB/min
+        </span>
+        <div className="flex items-center gap-3 text-xs">
+          <div className="flex items-center gap-1">
+            <span className="text-muted-foreground">R²</span>
+            <span className={cn("font-bold", r2Color)}>{r2.toFixed(2)}</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <span className="text-muted-foreground">samples</span>
+            <span className="font-medium text-card-foreground">{n}</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <span className="text-muted-foreground">window</span>
+            <span className="font-medium text-card-foreground">{mins}min</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  return <span className="text-sm text-card-foreground leading-relaxed">{text}</span>;
 }

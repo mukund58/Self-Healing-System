@@ -54,7 +54,7 @@ A Kubernetes-based **truly self-healing system** that automatically detects anom
    - HTTP error rate (`rate(5xx) / rate(total)`)
    - Request rate (`rate(http_requests_received_total)`)
 3. **Three anomaly detection rules** evaluate sliding windows:
-   - **MemoryLeakRule** — 8 samples, triggers if memory slope > 15 MB/min, 3-min cooldown
+   - **MemoryLeakRule** — 20-sample OLS linear regression (~100s window), triggers when slope > 15 MB/min **AND** R² > 0.60 (statistically significant trend), 3-min cooldown. Critical severity when slope > 50 MB/min and R² > 0.85.
    - **CpuSpikeRule** — 10 samples, triggers if 7/10 samples > 80% CPU, 5-min cooldown, critical > 95%
    - **HighErrorRateRule** — 6 samples, triggers if 4/6 samples > 10% error rate, 3-min cooldown
 4. On anomaly, **DiagnosticService** correlates all metrics to classify root cause:
@@ -299,16 +299,21 @@ DemoApp/
 │       └── TaskItem.cs
 ├── Analyzer/                   # .NET 9 monitoring service
 │   ├── Dockerfile
-│   ├── Program.cs              # Minimal API (status, events, recoveries)
-│   ├── PrometheusClient.cs     # Prometheus query client
+│   ├── Program.cs              # Minimal API (status, events, recoveries, learning)
+│   ├── PrometheusClient.cs     # Prometheus query client (memory, CPU, error rate, request rate)
 │   ├── Domains/
 │   │   ├── FailureEvent.cs
 │   │   ├── MetricSample.cs
 │   │   └── MonitoringState.cs
 │   ├── Rules/
-│   │   └── MemoryLeakRule.cs   # Sliding window anomaly detection
+│   │   ├── MemoryLeakRule.cs   # OLS linear regression (slope + R² confidence gating)
+│   │   ├── CpuSpikeRule.cs     # Threshold-count anomaly detection
+│   │   └── HighErrorRateRule.cs # Error rate threshold detection
 │   └── Service/
-│       └── MonitoringService.cs # Background monitoring loop
+│       ├── MonitoringService.cs  # Background monitoring loop (parallel 4-metric fetch)
+│       ├── DiagnosticService.cs  # Root cause diagnosis (signal correlation)
+│       ├── RemediationEngine.cs  # Multi-step strategic remediation
+│       └── LearningService.cs    # Records outcomes, recommends best strategies
 └── task-frontend/              # React 19 + Vite + Tailwind CSS v4
     ├── package.json
     ├── vite.config.js
@@ -316,6 +321,7 @@ DemoApp/
         ├── App.jsx
         ├── api.js              # API client functions
         ├── lib/utils.js        # Utility helpers
+        ├── hooks/usePolling.js  # Generic polling hook
         └── components/
             ├── ui/             # shadcn-style UI primitives
             ├── Header.jsx
@@ -324,6 +330,7 @@ DemoApp/
             ├── FailuresTab.jsx
             ├── RecoveriesTab.jsx
             ├── MetricsTab.jsx
+            ├── LearningTab.jsx     # Learning loop visualization
             └── NotificationPanel.jsx
 ```
 

@@ -105,7 +105,7 @@ export function FailuresTab() {
                   </Badge>
                 </TableCell>
                 <TableCell>
-                  <span className="max-w-[300px] truncate block text-sm">{e.description}</span>
+                  <DescriptionCell text={e.description} />
                 </TableCell>
                 <TableCell>
                   <span className="text-xs text-muted-foreground">{new Date(e.detectedAt).toLocaleString()}</span>
@@ -143,4 +143,35 @@ export function FailuresTab() {
       </Card>
     </div>
   );
+}
+
+/** Parse regression stats from description like "Memory trending +18.7 MB/min (R²=0.74, n=20, 1.6min window)" */
+function DescriptionCell({ text }) {
+  const match = text?.match(/([\+\-]?[\d.]+)\s*MB\/min.*?R²=(\d\.\d+).*?n=(\d+).*?([\d.]+)min/);
+  if (match) {
+    const slope = parseFloat(match[1]);
+    const r2 = parseFloat(match[2]);
+    const n = parseInt(match[3]);
+    const window = match[4];
+    return (
+      <div className="flex flex-col gap-1 max-w-[340px]">
+        <span className="text-sm text-foreground font-medium">
+          +{slope.toFixed(1)} MB/min
+        </span>
+        <div className="flex items-center gap-2 text-[0.65rem]">
+          <span className={cn(
+            "px-1.5 py-0.5 rounded-md font-semibold",
+            r2 >= 0.85 ? "bg-destructive/10 text-destructive" :
+            r2 >= 0.60 ? "bg-warning/10 text-warning" :
+            "bg-muted text-muted-foreground"
+          )}>
+            R²={r2.toFixed(2)}
+          </span>
+          <span className="text-muted-foreground">n={n}</span>
+          <span className="text-muted-foreground">{window}min</span>
+        </div>
+      </div>
+    );
+  }
+  return <span className="max-w-[300px] truncate block text-sm">{text}</span>;
 }
