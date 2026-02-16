@@ -17,17 +17,12 @@ builder.Services.AddControllers();
 builder.Services.AddHealthChecks()
     .AddCheck("self", () => HealthCheckResult.Healthy("OK"));
 
-var allowedOrigins = builder.Configuration
-    .GetSection("Cors:AllowedOrigins")
-    .Get<string[]>()
-    ?? new[] { "http://localhost:5173" };
-
 builder.Services.AddCors(options =>
 {
     options.AddPolicy(corsPolicyName, policy =>
     {
         policy
-            .WithOrigins(allowedOrigins)
+            .AllowAnyOrigin()
             .AllowAnyHeader()
             .AllowAnyMethod();
     });
@@ -35,6 +30,14 @@ builder.Services.AddCors(options =>
 
 
 var app = builder.Build();
+
+// Auto-apply EF migrations at startup
+using (var scope = app.Services.CreateScope())
+{
+    var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+    db.Database.Migrate();
+}
+
 // Use CORS (ORDER MATTERS)
 app.UseCors(corsPolicyName);
 
