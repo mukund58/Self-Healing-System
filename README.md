@@ -1,36 +1,109 @@
-# Self-Healing-System
- Self-Healing System – UML Class Diagram
+# Self-Healing System
 
-A comprehensive self-healing system designed to automatically detect, diagnose, and recover from failures in distributed systems. This project includes UML class diagrams and ER diagrams to illustrate the system architecture and database design.
+A Kubernetes-based self-healing system that automatically detects anomalies, diagnoses failures, and performs recovery actions (pod restarts, horizontal scaling) in distributed applications — with a React dashboard for real-time monitoring.
 
 ## 📋 Overview
 
-The Self-Healing System is an intelligent infrastructure management solution that monitors system health, identifies anomalies, and automatically applies corrective actions to maintain optimal performance and availability.
+The Self-Healing System monitors application health via Prometheus metrics, detects anomalies using sliding-window analysis, and automatically triggers Kubernetes recovery actions. All layers — observability, analysis, decision engine, and orchestration — are fully implemented and working.
+
+```
+┌──────────────────────────┐
+│   Kubernetes Orchestrator│   ✅ BUILT — scales & restarts pods
+│  (acts on decisions)     │
+└──────────▲───────────────┘
+           │
+┌──────────┴───────────────┐
+│   Decision Engine        │   ✅ BUILT — MemoryLeakRule + cooldowns
+│  (chooses actions)       │
+└──────────▲───────────────┘
+           │
+┌──────────┴───────────────┐
+│   Analyzer               │   ✅ BUILT — sliding window detection
+│  (detects anomalies)     │
+└──────────▲───────────────┘
+           │
+┌──────────┴───────────────┐
+│   Observability Layer    │   ✅ BUILT — Prometheus + health checks
+│  (metrics + health)      │
+└──────────────────────────┘
+```
 
 ## 🎯 Features
 
-- **Automated Failure Detection**: Continuous monitoring of system components
-- **Self-Diagnosis**: Intelligent analysis of system issues
-- **Automatic Recovery**: Predefined and adaptive recovery strategies
-- **Scalable Architecture**: Designed for distributed systems
-- **Comprehensive Logging**: Detailed event tracking and audit trails
+- **Automated Failure Detection** — Prometheus scrapes metrics every 5s, Analyzer evaluates memory growth slope
+- **Sliding Window Analysis** — 8-sample window (~40s) with 15 MB/min threshold and 3-min cooldown
+- **Automatic Recovery** — Scales to 3 replicas + rolling restart on anomaly detection
+- **Full Persistence** — Failure events, recovery actions, and metrics stored in PostgreSQL
+- **Real-Time Dashboard** — React 19 + Tailwind CSS v4 + Recharts with live metrics, failures, and recoveries
+- **Stress Testing** — Built-in endpoints to simulate memory leaks and CPU exhaustion
+- **Comprehensive API** — 18 REST endpoints across TaskApi and Analyzer services
 
-## 📊 System Architecture
+---
 
-**Note:** The UML and ER diagrams represent the planned/future design. The current demo implementation is smaller and focuses on health checks, metrics, and Kubernetes self-healing.
+## 📚 Documentation
 
-### UML Class Diagram
+| Document | Description |
+|----------|-------------|
+| [**DemoApp/README.md**](DemoApp/README.md) | Full setup guide — architecture, installation, configuration, troubleshooting |
+| [**DemoApp/docs/API.md**](DemoApp/docs/API.md) | Complete API reference — all 18 endpoints, request/response examples, data models |
+| [**DemoApp/install.sh**](DemoApp/install.sh) | Automated Linux install script — installs all prerequisites and deploys to K8s |
+| [**DemoApp/run.sh**](DemoApp/run.sh) | Run script — starts port-forwards and frontend dev server |
 
-The system architecture is documented in the UML class diagram, which illustrates the relationships between key components:
+### Quick Start
 
-### Sequence Diagram.
-![Sequence Diagram]( UML/Sequence-Diagram.png)
+```bash
+cd DemoApp
+chmod +x install.sh run.sh
+
+# Install everything (Docker, Kind, kubectl, .NET, Node.js, K8s cluster)
+./install.sh
+
+# Start all services
+./run.sh
+```
+
+> See [DemoApp/README.md](DemoApp/README.md) for manual installation and detailed configuration.
+
+---
+
+## 🏗️ Architecture
+
+```
+┌─────────────┐    ┌─────────────┐    ┌──────────────┐    ┌────────────┐
+│  React UI   │───▶│   TaskApi    │◀───│   Analyzer    │───▶│ Kubernetes │
+│  (Vite)     │    │  (.NET 8)   │    │  (.NET 9)     │    │  API       │
+└─────────────┘    └──────┬──────┘    └───────┬───────┘    └────────────┘
+                          │                   │
+                   ┌──────▼──────┐    ┌───────▼───────┐
+                   │ PostgreSQL  │    │  Prometheus    │
+                   │   16        │    │  (Scraping)    │
+                   └─────────────┘    └───────────────┘
+```
+
+| Component       | Tech Stack                                           | Purpose                                    |
+|----------------|------------------------------------------------------|--------------------------------------------|
+| **TaskApi**     | ASP.NET Core 8, EF Core, Npgsql, prometheus-net      | REST API, data persistence, Prometheus metrics |
+| **Analyzer**    | ASP.NET Core 9, KubernetesClient                     | Anomaly detection, recovery orchestration  |
+| **Frontend**    | React 19, Vite, Tailwind CSS v4, Recharts, Radix UI  | Dashboard, monitoring, task management     |
+| **PostgreSQL**  | PostgreSQL 16                                         | Tasks, metrics, failures, recoveries       |
+| **Prometheus**  | prom/prometheus                                       | Metrics scraping (5s interval)             |
+| **Grafana**     | Grafana 11.0.0                                        | Metrics visualization                      |
+| **Kubernetes**  | Kind (Kubernetes in Docker)                           | Container orchestration                    |
+
+---
+
+## 📊 System Design Diagrams
+
+The UML and ER diagrams document the full system design and data model.
+
+### Sequence Diagram
+![Sequence Diagram](UML/Sequence-Diagram.png)
 
 ### Use-Case Diagram
-![Use Case  Diagram]( UML/USE-Case-Diagram.png)
+![Use Case Diagram](UML/USE-Case-Diagram.png)
 
-### UML-Activity Diagram
-![UML Activity Diagram]( UML/UML-Activity-Diagram.png)
+### UML Activity Diagram
+![UML Activity Diagram](UML/UML-Activity-Diagram.png)
 
 ### ER Diagrams
 
@@ -42,11 +115,7 @@ The database schema and entity relationships are visualized in multiple ER diagr
 #### Relational Table 
 ![Relational Table ](UML/Relational-Table.png)
 
-## 📖 Documentation
-
-- Read the [docs](DemoApp/README.md)
-- **UML Class Diagram**: Defines the object-oriented structure and relationships
-- **ER Diagrams**: Define the database schema and entity relationships
+---
 
 ## ✅ How To Use In Your Project
 
@@ -99,6 +168,8 @@ Reference file:
 - Keep the health checks and metrics as part of your service boundary.
 
 If you need a full walkthrough, follow [DemoApp/README.md](DemoApp/README.md).
+
+---
 
 ## 📦 Copy-Paste Scaffold Template
 
@@ -228,10 +299,12 @@ spec:
 
 If you want the full working example, clone and follow [DemoApp/README.md](DemoApp/README.md).
 
+---
 
 ## 📄 License
 
 This project is licensed under the terms specified in the [LICENSE](LICENSE) file.
 
+---
 
-- GitHub: [@mukund58](https://github.com/mukund58)
+**GitHub:** [@mukund58](https://github.com/mukund58)
