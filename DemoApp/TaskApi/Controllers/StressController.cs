@@ -33,13 +33,16 @@ public class StressController : ControllerBase
         return Ok($"CPU stressed for {seconds} seconds");
     }
 
+    private static List<byte[]> _leak = new();
+
     [HttpGet("memory")]
     public IActionResult Memory([FromQuery] int mb = 100)
     {
-        AppMetrics.MemoryAllocatedMb.Set(mb);
-
         var buffer = new byte[mb * 1024 * 1024];
-        return Ok($"Allocated {mb} MB of memory");
+        _leak.Add(buffer);   // ← THIS PREVENTS GC
+
+        return Ok($"Leaked {mb} MB");
     }
+
 
 }
