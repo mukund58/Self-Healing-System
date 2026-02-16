@@ -1,5 +1,6 @@
 using Analyzer.Domain;
 using Analyzer.Rules;
+using Analyzer.Service;
 
 namespace Analyzer;
 
@@ -9,27 +10,37 @@ public class MonitoringService : BackgroundService
     private readonly MetricIngestClient _ingest;
     private readonly MemoryLeakRule _rule;
     private readonly MonitoringState _state;
+    private readonly IServiceScopeFactory _scopeFactory;
+    private readonly ILogger<MonitoringService> _logger;
 
     public MonitoringService(
         PrometheusClient client,
         MetricIngestClient ingest,
         MemoryLeakRule rule,
-        MonitoringState state)
+        MonitoringState state,
+        IServiceScopeFactory scopeFactory,
+        ILogger<MonitoringService> logger)
     {
         _client = client;
         _ingest = ingest;
         _rule = rule;
         _state = state;
+        _scopeFactory = scopeFactory;
+        _logger = logger;
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
+        // Wait briefly for services to initialize
+        await Task.Delay(TimeSpan.FromSeconds(2), stoppingToken);
+
         while (!stoppingToken.IsCancellationRequested)
         {
             try
             {
                 var samples = await _client.GetMemorySamplesAsync();
 
+                // Store metrics in DB
                 if (samples.Any())
                 {
                     var payload = samples.Select(sample => new MetricRecordDto
@@ -42,9 +53,10 @@ public class MonitoringService : BackgroundService
 
                     var stored = await _ingest.SendAsync(payload, stoppingToken);
                     if (!stored)
-                        Console.WriteLine("Failed to store metric records");
+                        _logger.LogWarning("Failed to store metric records");
                 }
 
+                // Evaluate anomaly rules
                 if (samples.Any())
                 {
                     var latest = samples.Last();
@@ -53,16 +65,40 @@ public class MonitoringService : BackgroundService
                     if (result != null)
                     {
                         _state.LastResult = result;
-                        Console.WriteLine($"⚠ Memory anomaly detected: {result.Description}");
+                        _state.RecentEvents.Add(result);
+                        _logger.LogWarning("⚠ Anomaly detected: {Type} - {Desc}",
+                            result.FailureType, result.Description);
+
+                        // Trigger recovery orchestrator
+                        await TriggerRecoveryAsync(result, stoppingToken);
                     }
                 }
             }
             catch (Exception ex)
             {
-                Console.WriteLine($"Monitoring error: {ex.Message}");
+                _logger.LogError(ex, "Monitoring error");
             }
 
             await Task.Delay(TimeSpan.FromSeconds(5), stoppingToken);
+        }
+    }
+
+    private async Task TriggerRecoveryAsync(FailureEvent failure, CancellationToken ct)
+    {
+        try
+        {
+            using var scope = _scopeFactory.CreateScope();
+            var orchestrator = scope.ServiceProvider.GetRequiredService<RecoveryOrchestrator>();
+            var recoveryResult = await orchestrator.HandleFailureAsync(failure, ct);
+
+            if (recoveryResult != null)
+            {
+                _state.RecentRecoveries.Add(recoveryResult);
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "Recovery orchestration failed");
         }
     }
 }

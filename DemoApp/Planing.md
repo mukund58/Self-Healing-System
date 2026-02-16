@@ -11,3 +11,11 @@ Backend ->
 
 Frontend ->
 1. Admin Dashboard (Done via prometheus)
+
+Prometheus → Analyzer detects anomaly
+  → Persist FailureEvent to TaskApi DB
+  → Determine recovery action (RestartPod/ScaleUp)
+  → Execute via Kubernetes API
+  → Update recovery status in DB
+  → Resolve failure event if successful
+  → Notify admin (console + webhook)
