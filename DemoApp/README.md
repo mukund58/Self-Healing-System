@@ -1,6 +1,6 @@
 # Self-Healing System
 
-A Kubernetes-based self-healing system that automatically detects anomalies (memory leaks, resource exhaustion) in running applications and performs recovery actions like pod restarts and horizontal scaling.
+A Kubernetes-based **truly self-healing system** that automatically detects anomalies, diagnoses root causes through signal correlation, selects multi-step remediation strategies, and learns from past recovery outcomes to improve future decisions.
 
 ---
 
@@ -18,10 +18,27 @@ A Kubernetes-based self-healing system that automatically detects anomalies (mem
                    └─────────────┘    └───────────────┘
 ```
 
+### Intelligence Pipeline
+
+```
+ Prometheus Metrics ──┐
+  (memory, CPU,      │    ┌───────────────┐     ┌──────────────────┐     ┌──────────────┐
+   error rate,       ├───▶│ Anomaly Rules │────▶│ Root Cause       │────▶│ Remediation  │
+   request rate)     │    │ (3 detectors) │     │ Diagnosis        │     │ Engine       │
+                     │    └───────────────┘     │ (signal          │     │ (multi-step  │
+                     │                          │  correlation)    │     │  strategies) │
+                     │                          └──────────────────┘     └──────┬───────┘
+                     │                                                         │
+                     │    ┌───────────────────────────────────────────────────┐ │
+                     └───▶│ Learning Loop (records outcomes, recommends      │◀┘
+                          │ best strategies based on historical success rate)│
+                          └───────────────────────────────────────────────────┘
+```
+
 | Component       | Tech Stack                          | Purpose                                    |
 |----------------|-------------------------------------|--------------------------------------------|
 | **TaskApi**     | ASP.NET Core 8, EF Core, Npgsql    | REST API, data persistence, Prometheus metrics |
-| **Analyzer**    | ASP.NET Core 9, KubernetesClient    | Anomaly detection, recovery orchestration  |
+| **Analyzer**    | ASP.NET Core 9, KubernetesClient    | Anomaly detection, diagnosis, remediation, learning |
 | **Frontend**    | React 19, Vite, Tailwind CSS v4, Recharts, Radix UI | Dashboard, monitoring, task management |
 | **PostgreSQL**  | PostgreSQL 16                       | Data store for tasks, metrics, failures, recoveries |
 | **Prometheus**  | prom/prometheus                     | Metrics scraping (5s interval)             |
@@ -31,17 +48,30 @@ A Kubernetes-based self-healing system that automatically detects anomalies (mem
 ### How It Works
 
 1. **Prometheus** scrapes `/metrics` from TaskApi every 5 seconds
-2. **Analyzer** queries Prometheus for `process_working_set_bytes` every 5 seconds
-3. **MemoryLeakRule** evaluates a sliding window (8 samples / ~40 seconds):
-   - Calculates memory growth slope (MB/min)
-   - Triggers alert if slope > 15 MB/min
-   - 3-minute cooldown between alerts
-4. On anomaly detection, **RecoveryOrchestrator**:
-   - Persists failure event to TaskApi database
-   - Scales deployment to 3 replicas
-   - Rolls a restart on the deployment
-   - Records recovery action with success/failure status
-5. **Frontend** displays real-time dashboard with metrics, failures, and recovery status
+2. **Analyzer** queries Prometheus for 4 metrics in parallel every 5 seconds:
+   - Memory working set (`system_runtime_working_set`)
+   - CPU usage percent (`rate(process_cpu_seconds_total)`)
+   - HTTP error rate (`rate(5xx) / rate(total)`)
+   - Request rate (`rate(http_requests_received_total)`)
+3. **Three anomaly detection rules** evaluate sliding windows:
+   - **MemoryLeakRule** — 8 samples, triggers if memory slope > 15 MB/min, 3-min cooldown
+   - **CpuSpikeRule** — 10 samples, triggers if 7/10 samples > 80% CPU, 5-min cooldown, critical > 95%
+   - **HighErrorRateRule** — 6 samples, triggers if 4/6 samples > 10% error rate, 3-min cooldown
+4. On anomaly, **DiagnosticService** correlates all metrics to classify root cause:
+   - `ResourceExhaustion` — high memory + high CPU + low traffic
+   - `TrafficOverload` — high traffic + high errors + high CPU
+   - `ApplicationError` — high errors + low traffic
+   - `DependencyFailure` — high traffic + high errors + low CPU/memory
+   - `MemoryLeakSuspected` — high memory only
+   - `HighCpuUsage` — high CPU only
+5. **RemediationEngine** selects multi-step strategy based on diagnosis:
+   - `RestartWithBuffer` — ScaleUp → RestartPod (for memory leaks)
+   - `ScaleUpAggressive` — ScaleUp (for traffic overload)
+   - `ScaleAndRestart` — ScaleUp → RestartPod (for dependency failures)
+   - `RestartAndMonitor` — RestartPod (for application errors)
+   - Each strategy executes steps sequentially with configurable delays
+6. **LearningService** records every recovery outcome and recommends strategies with the highest historical success rate (requires ≥3 samples at >70% success to override defaults)
+7. **Frontend** displays real-time dashboard with metrics, failures, and recovery status
 
 ---
 

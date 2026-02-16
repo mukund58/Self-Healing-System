@@ -8,7 +8,7 @@ import { Separator } from "@/components/ui/Separator";
 import { PulseDot } from "@/components/PulseDot";
 import { NotificationPanel } from "@/components/NotificationPanel";
 
-const NAV_TABS = ["Dashboard", "Tasks", "Failures", "Recoveries", "Metrics"];
+const NAV_TABS = ["Dashboard", "Tasks", "Failures", "Recoveries", "Metrics", "Learning"];
 
 export function Header({ tab, onTabChange, health, alerts, recoveries }) {
   const [notifOpen, setNotifOpen] = useState(false);

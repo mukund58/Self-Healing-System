@@ -18,6 +18,8 @@
   - [Status](#status)
   - [Events](#events)
   - [Recoveries](#recoveries)
+  - [Learning Report](#learning-report)
+  - [Learning Recommendation](#learning-recommendation)
 - [Data Models](#data-models)
 - [Error Handling](#error-handling)
 - [Internal Communication](#internal-communication)
@@ -483,6 +485,81 @@ Get the last 20 recovery results from the analyzer.
     "performedAt": "2025-01-15T10:31:00Z"
   }
 ]
+```
+
+---
+
+### Learning Report
+
+#### `GET /learning`
+
+Get the full learning loop report — historical success/failure rates for each root cause and strategy combination.
+
+**Response:** `200 OK`
+
+```json
+{
+  "generatedAt": "2026-02-16T19:36:08Z",
+  "totalPatterns": 2,
+  "patterns": [
+    {
+      "rootCause": "MemoryLeakSuspected",
+      "strategyName": "RestartWithBuffer",
+      "successes": 3,
+      "failures": 0,
+      "successRate": 1.0,
+      "totalAttempts": 3
+    },
+    {
+      "rootCause": "HighCpuUsage",
+      "strategyName": "ScaleUpForCpu",
+      "successes": 2,
+      "failures": 1,
+      "successRate": 0.67,
+      "totalAttempts": 3
+    }
+  ],
+  "recentEvents": [
+    {
+      "timestamp": "2026-02-16T19:33:42Z",
+      "rootCause": "MemoryLeakSuspected",
+      "strategyName": "RestartWithBuffer",
+      "success": true,
+      "newSuccessRate": 1.0,
+      "totalAttempts": 1
+    }
+  ]
+}
+```
+
+---
+
+### Learning Recommendation
+
+#### `GET /learning/{rootCause}`
+
+Get the best-performing strategy recommendation for a specific root cause.
+
+**Path Parameter:** `rootCause` — one of: `MemoryLeakSuspected`, `HighCpuUsage`, `ResourceExhaustion`, `TrafficOverload`, `ApplicationError`, `DependencyFailure`, `HighErrorRate`
+
+**Response:** `200 OK`
+
+If data exists:
+```json
+{
+  "strategyName": "RestartWithBuffer",
+  "successRate": 1.0,
+  "totalAttempts": 3,
+  "successes": 3,
+  "failures": 0
+}
+```
+
+If no data yet:
+```json
+{
+  "message": "No learning data yet for 'HighCpuUsage'"
+}
 ```
 
 ---

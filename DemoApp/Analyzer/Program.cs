@@ -48,15 +48,30 @@ builder.Services.AddSingleton<KubernetesScaler>();
 // Notification service
 builder.Services.AddHttpClient<NotificationService>();
 
-// Core services
+// Anomaly detection rules (singletons — they maintain sliding windows)
 builder.Services.AddSingleton<MemoryLeakRule>();
+builder.Services.AddSingleton<CpuSpikeRule>();
+builder.Services.AddSingleton<HighErrorRateRule>();
+
+// Shared state
 builder.Services.AddSingleton<MonitoringState>();
+
+// Intelligence layer
+builder.Services.AddSingleton<LearningService>();
+builder.Services.AddScoped<DiagnosticService>();
+builder.Services.AddScoped<RemediationEngine>();
+
+// Legacy orchestrator (kept for backward compatibility)
 builder.Services.AddScoped<RecoveryOrchestrator>();
+
+// Background monitoring
 builder.Services.AddHostedService<MonitoringService>();
 
 var app = builder.Build();
 
 app.UseCors();
+
+// ── Status & monitoring endpoints ──────────────────────────────────────
 
 app.MapGet("/status", (MonitoringState state) =>
 {
@@ -74,6 +89,21 @@ app.MapGet("/events", (MonitoringState state) =>
 app.MapGet("/recoveries", (MonitoringState state) =>
 {
     return Results.Ok(state.RecentRecoveries.TakeLast(20));
+});
+
+// ── Intelligence endpoints ─────────────────────────────────────────────
+
+app.MapGet("/learning", (LearningService learner) =>
+{
+    return Results.Ok(learner.GetReport());
+});
+
+app.MapGet("/learning/{rootCause}", (string rootCause, LearningService learner) =>
+{
+    var recommendation = learner.GetBestStrategy(rootCause);
+    return recommendation is not null
+        ? Results.Ok(recommendation)
+        : Results.Ok(new { message = $"No learning data yet for '{rootCause}'" });
 });
 
 app.Run();

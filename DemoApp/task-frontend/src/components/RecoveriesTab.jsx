@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { RefreshCw, CheckCircle, XCircle, Clock, Target } from "lucide-react";
+import { RefreshCw, CheckCircle, XCircle, Clock, Target, ChevronDown, ChevronRight, Layers } from "lucide-react";
 import { getRecoveryActions } from "@/api";
 import { cn } from "@/lib/utils";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/Card";
@@ -8,6 +8,19 @@ import { Progress } from "@/components/ui/Progress";
 import {
   Table, TableHeader, TableBody, TableRow, TableHead, TableCell, TableEmpty,
 } from "@/components/ui/Table";
+
+function parseSteps(details) {
+  if (!details || !details.includes("|")) return null;
+  return details.split("|").map((s) => s.trim()).filter(Boolean).map((step) => {
+    const match = step.match(/^(\w+):\s*(Success|Failed)\s*-?\s*(.*)$/);
+    if (match) return { action: match[1], status: match[2], detail: match[3] };
+    return { action: "Step", status: "Unknown", detail: step };
+  });
+}
+
+function isStrategy(actionType) {
+  return actionType && /[A-Z].*[A-Z]/.test(actionType) && actionType !== "RestartPod" && actionType !== "ScaleUp" && actionType !== "ScaleDown";
+}
 
 export function RecoveriesTab() {
   const [actions, setActions] = useState([]);
@@ -66,39 +79,59 @@ export function RecoveriesTab() {
             </TableRow>
           </TableHeader>
           <TableBody>
-            {actions.map((a) => (
-              <TableRow key={a.id}>
-                <TableCell>
-                  <Badge>{a.actionType}</Badge>
-                </TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-1.5">
-                    <Target className="w-3 h-3 text-muted-foreground" />
-                    <span className="font-mono text-xs text-foreground">{a.targetDeployment}</span>
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <Badge variant={a.status === "Success" ? "success" : "destructive"} className="gap-1">
-                    {a.status === "Success" ? <CheckCircle className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
-                    {a.status}
-                  </Badge>
-                </TableCell>
-                <TableCell>
-                  <span className="max-w-[300px] truncate block text-xs text-muted-foreground">{a.details}</span>
-                </TableCell>
-                <TableCell>
-                  <div className="flex items-center gap-1.5 text-muted-foreground">
-                    <Clock className="w-3 h-3" />
-                    <span className="text-xs">{new Date(a.performedAt).toLocaleString()}</span>
-                  </div>
-                </TableCell>
-                <TableCell>
-                  <span className="text-xs text-muted-foreground">
-                    {a.completedAt ? new Date(a.completedAt).toLocaleString() : "—"}
-                  </span>
-                </TableCell>
-              </TableRow>
-            ))}
+            {actions.map((a) => {
+              const steps = parseSteps(a.details);
+              const strategy = isStrategy(a.actionType);
+              return (
+                <TableRow key={a.id}>
+                  <TableCell>
+                    <div className="flex items-center gap-1.5">
+                      {strategy && <Layers className="w-3.5 h-3.5 text-accent" />}
+                      <Badge variant={strategy ? "default" : "outline"}>{a.actionType}</Badge>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-1.5">
+                      <Target className="w-3 h-3 text-muted-foreground" />
+                      <span className="font-mono text-xs text-foreground">{a.targetDeployment}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={a.status === "Success" ? "success" : "destructive"} className="gap-1">
+                      {a.status === "Success" ? <CheckCircle className="w-3 h-3" /> : <XCircle className="w-3 h-3" />}
+                      {a.status}
+                    </Badge>
+                  </TableCell>
+                  <TableCell>
+                    {steps ? (
+                      <div className="flex flex-col gap-1">
+                        {steps.map((s, i) => (
+                          <div key={i} className="flex items-center gap-1.5 text-xs">
+                            <span className="inline-flex items-center justify-center w-4 h-4 rounded-full bg-secondary text-[0.55rem] font-bold text-muted-foreground">{i + 1}</span>
+                            <Badge variant="outline" className="text-[0.6rem] px-1.5 py-0">{s.action}</Badge>
+                            {s.status === "Success" ? <CheckCircle className="w-3 h-3 text-success" /> : <XCircle className="w-3 h-3 text-destructive" />}
+                            <span className="text-muted-foreground truncate max-w-[180px]">{s.detail}</span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <span className="max-w-[300px] truncate block text-xs text-muted-foreground">{a.details}</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-1.5 text-muted-foreground">
+                      <Clock className="w-3 h-3" />
+                      <span className="text-xs">{new Date(a.performedAt).toLocaleString()}</span>
+                    </div>
+                  </TableCell>
+                  <TableCell>
+                    <span className="text-xs text-muted-foreground">
+                      {a.completedAt ? new Date(a.completedAt).toLocaleString() : "—"}
+                    </span>
+                  </TableCell>
+                </TableRow>
+              );
+            })}
           </TableBody>
         </Table>
         {actions.length === 0 && (

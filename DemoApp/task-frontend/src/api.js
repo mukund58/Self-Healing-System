@@ -46,6 +46,12 @@ export async function getRecoveryActions(limit = 50) {
   return res.json();
 }
 
+// ─── Health ───
+export async function getHealth() {
+  const res = await fetch(`${API_BASE}/health`);
+  return res.json();
+}
+
 // ─── Analyzer Status ───
 export async function getAnalyzerStatus() {
   const res = await fetch(`${ANALYZER_BASE}/status`);
@@ -59,5 +65,16 @@ export async function getAnalyzerEvents() {
 
 export async function getAnalyzerRecoveries() {
   const res = await fetch(`${ANALYZER_BASE}/recoveries`);
+  return res.json();
+}
+
+// ─── Learning Loop ───
+export async function getLearningReport() {
+  const res = await fetch(`${ANALYZER_BASE}/learning`);
+  return res.json();
+}
+
+export async function getLearningRecommendation(rootCause) {
+  const res = await fetch(`${ANALYZER_BASE}/learning/${encodeURIComponent(rootCause)}`);
   return res.json();
 }

@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from "react";
-import { getAnalyzerEvents, getAnalyzerRecoveries } from "@/api";
+import { getAnalyzerEvents, getAnalyzerRecoveries, getHealth } from "@/api";
 import { TooltipProvider } from "@/components/ui/Tooltip";
 import { Header } from "@/components/Header";
 import { DashboardTab } from "@/components/DashboardTab";
@@ -7,9 +7,8 @@ import { TasksTab } from "@/components/TasksTab";
 import { FailuresTab } from "@/components/FailuresTab";
 import { RecoveriesTab } from "@/components/RecoveriesTab";
 import { MetricsTab } from "@/components/MetricsTab";
+import { LearningTab } from "@/components/LearningTab";
 import "./index.css";
-
-const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5186";
 
 export default function App() {
   const [tab, setTab] = useState("Dashboard");
@@ -20,10 +19,7 @@ export default function App() {
   const loadNotifs = useCallback(() => {
     getAnalyzerEvents().then(setAlerts).catch(() => {});
     getAnalyzerRecoveries().then(setRecoveries).catch(() => {});
-    fetch(`${API_URL}/health`)
-      .then((r) => r.json())
-      .then(setHealth)
-      .catch(() => setHealth(null));
+    getHealth().then(setHealth).catch(() => setHealth(null));
   }, []);
 
   useEffect(() => {
@@ -50,6 +46,7 @@ export default function App() {
             {tab === "Failures" && <FailuresTab />}
             {tab === "Recoveries" && <RecoveriesTab />}
             {tab === "Metrics" && <MetricsTab />}
+            {tab === "Learning" && <LearningTab />}
           </main>
 
           <footer className="flex items-center justify-center gap-3 py-5 mt-6 border-t border-border/40">

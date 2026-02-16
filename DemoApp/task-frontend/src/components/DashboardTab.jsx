@@ -1,12 +1,12 @@
 import { useEffect, useState, useMemo } from "react";
 import {
   Activity, Monitor, AlertTriangle, RefreshCw, CheckCircle, XCircle,
-  TrendingUp, Cpu, Server, Clock,
+  TrendingUp, Cpu, Server, Clock, Zap, Bug,
 } from "lucide-react";
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip as RechartsTooltip, ResponsiveContainer,
 } from "recharts";
-import { getAnalyzerStatus, getFailureEvents, getRecoveryActions } from "@/api";
+import { getAnalyzerStatus, getFailureEvents, getRecoveryActions, getHealth } from "@/api";
 import { cn, timeAgo, severityColor, severityBadge } from "@/lib/utils";
 import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/Card";
 import { Badge } from "@/components/ui/Badge";
@@ -23,6 +23,9 @@ export function DashboardTab({ health }) {
   const [failures, setFailures] = useState([]);
   const [recoveryActions, setRecoveryActions] = useState([]);
   const [memoryHistory, setMemoryHistory] = useState([]);
+  const [cpuHistory, setCpuHistory] = useState([]);
+  const [errorRateHistory, setErrorRateHistory] = useState([]);
+  const [metrics, setMetrics] = useState({ cpu: 0, errorRate: 0, requestRate: 0 });
 
   useEffect(() => {
     const load = () => {
@@ -35,17 +38,36 @@ export function DashboardTab({ health }) {
     return () => clearInterval(i);
   }, []);
 
-  // Track memory over time for the chart
+  // Track memory + CPU + error rate over time
   useEffect(() => {
+    const now = new Date();
+    const ts = now.toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" });
     if (health?.memoryMb) {
-      setMemoryHistory((prev) => {
-        const now = new Date();
-        const entry = { time: now.toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" }), mb: health.memoryMb };
-        const next = [...prev, entry].slice(-30);
-        return next;
-      });
+      setMemoryHistory((prev) => [...prev, { time: ts, mb: health.memoryMb }].slice(-30));
     }
   }, [health?.memoryMb]);
+
+  // Poll CPU + error metrics from metrics API
+  useEffect(() => {
+    const loadMetrics = async () => {
+      try {
+        const res = await fetch(
+          `${import.meta.env.VITE_API_URL || "http://localhost:5186"}/api/metrics?limit=10`
+        );
+        const data = await res.json();
+        const cpuVal = data.find((m) => m.metricType === "cpu")?.metricValue ?? 0;
+        const errVal = data.find((m) => m.metricType === "error_rate")?.metricValue ?? 0;
+        const reqVal = data.find((m) => m.metricType === "request_rate")?.metricValue ?? 0;
+        setMetrics({ cpu: cpuVal, errorRate: errVal, requestRate: reqVal });
+        const ts = new Date().toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit", second: "2-digit" });
+        setCpuHistory((prev) => [...prev, { time: ts, cpu: Math.round(cpuVal * 100) / 100 }].slice(-30));
+        setErrorRateHistory((prev) => [...prev, { time: ts, rate: Math.round(errVal * 100) / 100 }].slice(-30));
+      } catch {}
+    };
+    loadMetrics();
+    const i = setInterval(loadMetrics, 5000);
+    return () => clearInterval(i);
+  }, []);
 
   const totalRecoveries = recoveryActions.length;
   const successCount = recoveryActions.filter((r) => r.status === "Success").length;
@@ -102,6 +124,83 @@ export function DashboardTab({ health }) {
             indicatorClass={successRate >= 80 ? "bg-success" : successRate >= 50 ? "bg-warning" : "bg-destructive"}
           />
         </StatCard>
+      </div>
+
+      {/* CPU + Error Rate Mini Charts */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* CPU Chart */}
+        <Card>
+          <CardHeader>
+            <div className="flex flex-col gap-0.5">
+              <CardTitle className="flex items-center gap-2 text-sm">
+                <Cpu className="w-4 h-4 text-warning" />
+                CPU Usage
+              </CardTitle>
+              <CardDescription>Process CPU % over time</CardDescription>
+            </div>
+            <Badge variant="muted" className="text-[0.6rem]">{metrics.cpu.toFixed(1)}%</Badge>
+          </CardHeader>
+          <CardContent className="pb-2 px-2">
+            {cpuHistory.length > 1 ? (
+              <ResponsiveContainer width="100%" height={140}>
+                <AreaChart data={cpuHistory} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="cpuGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#fbbf24" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="#fbbf24" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#1b2433" vertical={false} />
+                  <XAxis dataKey="time" tick={{ fill: "#7d8590", fontSize: 9 }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fill: "#7d8590", fontSize: 9 }} axisLine={false} tickLine={false} unit="%" />
+                  <RechartsTooltip contentStyle={{ background: "#111820", border: "1px solid #1b2433", borderRadius: "12px", fontSize: "11px", color: "#e6edf3" }} />
+                  <Area type="monotone" dataKey="cpu" stroke="#fbbf24" strokeWidth={2} fill="url(#cpuGrad)" dot={false} />
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex items-center justify-center h-[140px] text-muted-foreground/40 text-xs">
+                <Cpu className="w-6 h-6 mr-2" /> Collecting...
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Error Rate Chart */}
+        <Card>
+          <CardHeader>
+            <div className="flex flex-col gap-0.5">
+              <CardTitle className="flex items-center gap-2 text-sm">
+                <Bug className="w-4 h-4 text-destructive" />
+                Error Rate
+              </CardTitle>
+              <CardDescription>HTTP 5xx error % over time</CardDescription>
+            </div>
+            <Badge variant={metrics.errorRate > 10 ? "destructive" : "muted"} className="text-[0.6rem]">{metrics.errorRate.toFixed(1)}%</Badge>
+          </CardHeader>
+          <CardContent className="pb-2 px-2">
+            {errorRateHistory.length > 1 ? (
+              <ResponsiveContainer width="100%" height={140}>
+                <AreaChart data={errorRateHistory} margin={{ top: 5, right: 10, left: -10, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="errGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#f87171" stopOpacity={0.3} />
+                      <stop offset="95%" stopColor="#f87171" stopOpacity={0} />
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#1b2433" vertical={false} />
+                  <XAxis dataKey="time" tick={{ fill: "#7d8590", fontSize: 9 }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fill: "#7d8590", fontSize: 9 }} axisLine={false} tickLine={false} unit="%" />
+                  <RechartsTooltip contentStyle={{ background: "#111820", border: "1px solid #1b2433", borderRadius: "12px", fontSize: "11px", color: "#e6edf3" }} />
+                  <Area type="monotone" dataKey="rate" stroke="#f87171" strokeWidth={2} fill="url(#errGrad)" dot={false} />
+                </AreaChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="flex items-center justify-center h-[140px] text-muted-foreground/40 text-xs">
+                <Bug className="w-6 h-6 mr-2" /> Collecting...
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
 
       {/* Memory Chart + Detection */}

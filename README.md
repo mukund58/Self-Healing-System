@@ -1,42 +1,48 @@
 # Self-Healing System
 
-A Kubernetes-based self-healing system that automatically detects anomalies, diagnoses failures, and performs recovery actions (pod restarts, horizontal scaling) in distributed applications — with a React dashboard for real-time monitoring.
+A Kubernetes-based **truly self-healing system** that automatically detects anomalies across multiple signals, diagnoses root causes through metric correlation, executes multi-step remediation strategies, and learns from past recovery outcomes — with a React dashboard for real-time monitoring.
 
 ## 📋 Overview
 
-The Self-Healing System monitors application health via Prometheus metrics, detects anomalies using sliding-window analysis, and automatically triggers Kubernetes recovery actions. All layers — observability, analysis, decision engine, and orchestration — are fully implemented and working.
+The Self-Healing System monitors application health via Prometheus metrics, detects anomalies using sliding-window analysis across memory, CPU, and error rates, correlates signals to diagnose root causes, selects intelligent multi-step recovery strategies, and learns from historical outcomes to improve future decisions.
 
 ```
 ┌──────────────────────────┐
-│   Kubernetes Orchestrator│   ✅ BUILT — scales & restarts pods
-│  (acts on decisions)     │
+│   Learning Loop          │   ✅ BUILT — records outcomes, recommends strategies
+│  (improves over time)    │
 └──────────▲───────────────┘
            │
 ┌──────────┴───────────────┐
-│   Decision Engine        │   ✅ BUILT — MemoryLeakRule + cooldowns
-│  (chooses actions)       │
+│   Remediation Engine     │   ✅ BUILT — multi-step strategies per root cause
+│  (ScaleUp → Restart)     │
 └──────────▲───────────────┘
            │
 ┌──────────┴───────────────┐
-│   Analyzer               │   ✅ BUILT — sliding window detection
-│  (detects anomalies)     │
+│   Root Cause Diagnosis   │   ✅ BUILT — correlates memory + CPU + errors + traffic
+│  (signal correlation)    │
 └──────────▲───────────────┘
            │
 ┌──────────┴───────────────┐
-│   Observability Layer    │   ✅ BUILT — Prometheus + health checks
+│   Anomaly Detection      │   ✅ BUILT — 3 rules: Memory, CPU, Error Rate
+│  (sliding windows)       │
+└──────────▲───────────────┘
+           │
+┌──────────┴───────────────┐
+│   Observability Layer    │   ✅ BUILT — Prometheus (4 metrics) + health checks
 │  (metrics + health)      │
 └──────────────────────────┘
 ```
 
 ## 🎯 Features
 
-- **Automated Failure Detection** — Prometheus scrapes metrics every 5s, Analyzer evaluates memory growth slope
-- **Sliding Window Analysis** — 8-sample window (~40s) with 15 MB/min threshold and 3-min cooldown
-- **Automatic Recovery** — Scales to 3 replicas + rolling restart on anomaly detection
+- **Multi-Signal Anomaly Detection** — 3 sliding-window rules for memory leaks, CPU spikes, and high error rates
+- **Root Cause Diagnosis** — Correlates 4 metrics (memory, CPU, error rate, request rate) to classify failures: ResourceExhaustion, TrafficOverload, ApplicationError, DependencyFailure, MemoryLeakSuspected, HighCpuUsage
+- **Strategic Remediation** — Multi-step recovery strategies (e.g., ScaleUp → wait → RestartPod) selected per root cause
+- **Learning Loop** — Records every recovery outcome and recommends the best strategy based on historical success rates
 - **Full Persistence** — Failure events, recovery actions, and metrics stored in PostgreSQL
 - **Real-Time Dashboard** — React 19 + Tailwind CSS v4 + Recharts with live metrics, failures, and recoveries
 - **Stress Testing** — Built-in endpoints to simulate memory leaks and CPU exhaustion
-- **Comprehensive API** — 18 REST endpoints across TaskApi and Analyzer services
+- **Comprehensive API** — 20 REST endpoints across TaskApi and Analyzer services
 
 ---
 
