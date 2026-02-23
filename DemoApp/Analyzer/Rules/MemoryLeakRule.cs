@@ -15,11 +15,11 @@ public class MemoryLeakRule
     private readonly ILogger<MemoryLeakRule> _logger;
 
     // ── Tuning knobs ────────────────────────────────────────────────
-    private const int WindowSize = 20;                // ~100s at 5s intervals — enough for meaningful regression
+    private const int WindowSize = 15;                // ~100s at 5s intervals — enough for meaningful regression
     private const int MinSamplesForRegression = 10;   // need at least this many before we trust the fit
-    private const double SlopeMbPerMinute = 15;       // trigger: sustained growth rate
-    private const double MinR2 = 0.60;                // confidence: at least 60% of variance explained by trend
-    private const double CriticalSlopeMbPerMinute = 50; // escalate to Critical severity
+    private const double SlopeMbPerMinute = 10;       // trigger: sustained growth rate
+    private const double MinR2 = 0.40;                // confidence: at least 60% of variance explained by trend
+    private const double CriticalSlopeMbPerMinute = 40; // escalate to Critical severity
     private const double HighConfidenceR2 = 0.85;     // high-confidence qualifier for severity upgrade
 
     private DateTime _lastAlertTime = DateTime.MinValue;

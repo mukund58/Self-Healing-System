@@ -10,6 +10,7 @@ data:
         type: prometheus
         access: proxy
         url: http://prometheus:9090
+        uid: prometheus
         isDefault: true
 ---
 apiVersion: v1
@@ -53,14 +54,22 @@ spec:
             - name: GF_AUTH_ANONYMOUS_ENABLED
               value: "true"
             - name: GF_AUTH_ANONYMOUS_ORG_ROLE
-              value: Viewer
+              value: Admin
             - name: GF_SECURITY_ALLOW_EMBEDDING
               value: "true"
+            - name: GF_SECURITY_X_FRAME_OPTIONS
+              value: "ALLOWALL"
+            - name: GF_SECURITY_CONTENT_SECURITY_POLICY
+              value: "false"
+            - name: GF_SECURITY_COOKIE_SAMESITE
+              value: "none"
           volumeMounts:
             - name: datasource
               mountPath: /etc/grafana/provisioning/datasources
             - name: dashboard-provider
               mountPath: /etc/grafana/provisioning/dashboards
+            - name: dashboards
+              mountPath: /var/lib/grafana/dashboards
       volumes:
         - name: datasource
           configMap:
@@ -68,6 +77,9 @@ spec:
         - name: dashboard-provider
           configMap:
             name: grafana-dashboard-provider
+        - name: dashboards
+          configMap:
+            name: grafana-dashboards
 ---
 apiVersion: v1
 kind: Service
